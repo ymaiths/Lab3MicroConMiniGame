@@ -40,6 +40,9 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
+
 UART_HandleTypeDef hlpuart1;
 
 SPI_HandleTypeDef hspi3;
@@ -49,17 +52,30 @@ uint8_t SPIRx[10];
 uint8_t SPITx[10];
 uint8_t Button[4];
 uint8_t mode =2 ;
+uint8_t PushOrder[10];
+uint8_t num;
+uint8_t a[5];
+uint8_t b;
+float c;
+uint8_t d;
+uint8_t RandNum;
+uint8_t LedOff;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_LPUART1_UART_Init(void);
 static void MX_SPI3_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
-//void IODIRB_Init();
+void IODIRA_Init();
+void IODIRB_Init();
 void SPITxRx_Setup();
 void SPITxRx_readIO();
+void SPITxRx_writeIO();
+void LedOrder();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -81,7 +97,8 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+
+	HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -96,11 +113,15 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_LPUART1_UART_Init();
   MX_SPI3_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   SPITxRx_Setup();
   IODIRB_Init();
+  IODIRA_Init();
+  num = 5;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -110,7 +131,26 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  SPITxRx_readIO();
+
+
+	  static uint64_t timestamp = 0;
+	  if (HAL_GetTick() > timestamp)
+	  {
+		  RandNum = (b%4)+1;
+		  if(mode == 1){
+			  SPITxRx_writeIO();
+		  }else if(mode ==2){
+			  SPITxRx_readIO();
+			  }
+
+		  timestamp = HAL_GetTick() + 1000;
+		  a[0] +=1;
+	  	  }
+
+
+
+	  //a = ADC_Read[0] % 4;
+	  b+=1;
   }
   /* USER CODE END 3 */
 }
@@ -159,6 +199,74 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_MultiModeTypeDef multimode = {0};
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.GainCompensation = 0;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure the ADC multi-mode
+  */
+  multimode.Mode = ADC_MODE_INDEPENDENT;
+  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -249,6 +357,23 @@ static void MX_SPI3_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMAMUX1_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -301,51 +426,120 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void SPITxRx_Setup()
-{
-//CS pulse
-HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 0); // CS Select
-HAL_Delay(1);
-HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 1); // CS deSelect
-HAL_Delay(1);
-}
-
-void IODIRB_Init(){
-	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 0);
-	SPITx[0] = 0b01000000;
-	SPITx[1] = 0x01;
-	SPITx[2] = 0b11111111;
-	SPITx[3] = 0;
-	HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
-
-}
 
 void SPITxRx_readIO()
 {
-if(HAL_GPIO_ReadPin(GPIOD,GPIO_PIN_2))
-{
-HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 0); // CS Select
-if(mode == 1){
-	SPITx[0] = 0b01000001;
-	SPITx[1] = 0x12;
-	SPITx[2] = 0;
-	SPITx[3] = 0;
-}else if(mode ==2){
-	SPITx[0] = 0b01000000;
-	SPITx[1] = 0x01;
-	SPITx[2] = 0b00000101;
-	SPITx[3] = 0;
+	if(HAL_GPIO_ReadPin(GPIOD,GPIO_PIN_2)){
+		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 0); // CS Select
+		SPITx[0] = 0b01000001;
+		SPITx[1] = 0x12;
+		SPITx[2] = 0;
+		SPITx[3] = 0;
+
+		HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
+//
+//	for(int i = 0;i<num;i++){
+//		if(SPIRx[2]== 1110){
+//			PushOrder[i] = 1;
+//		}else if(SPIRx[2]== 1101){
+//			PushOrder[i] = 2;
+//		}else if(SPIRx[2]== 1011){
+//			PushOrder[i] = 3;
+//		}else if(SPIRx[2]== 111){
+//			PushOrder[i] = 4;
+//		}
+
+}
 }
 
-HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
-}
+void SPITxRx_writeIO(){ //mode1
+	if(HAL_GPIO_ReadPin(GPIOD,GPIO_PIN_2)){
+		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 0); // CS Select
+		if(LedOff == 0){
+			SPITx[0] = 0b01000000;
+			SPITx[1] = 0x15;
+	//		SPITx[2] = 0b00000001;
+			SPITx[3] = 0;
+
+			for(int i = 0;i<=num;i++){
+				if(RandNum == 1){
+					SPITx[2] = ~(0b00000001);
+					LedOff = 1 ;
+				}else if(RandNum == 2){
+					SPITx[2] = ~(0b00000010);
+					LedOff = 1 ;
+				}else if(RandNum == 3){
+					SPITx[2] = ~(0b00000100);
+					LedOff = 1 ;
+				}else if(RandNum == 4){
+					SPITx[2] = ~(0b00001000);
+					LedOff = 1 ;
+				}
+		}
+			c = c+1;
+			if(c >= num){
+				num += 1;
+				SPITx[2] = 0b00000000;
+				mode = 2;
+				c = 0;
+			}
+			HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
+		}
+		else if(LedOff == 1){
+			SPITx[0] = 0b01000000;
+			SPITx[1] = 0x15;
+			SPITx[2] = 0b11111111;
+			SPITx[3] = 0;
+			LedOff = 0;
+			HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
+		}
+
+
+	}}
+
+
+void LedOrder(){
+	//RandNum = (ADC_Read[0] % 4)+1;
 }
 
+//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+//	if()
+//}
+void SPITxRx_Setup(){
+	//CS pulse
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 0); // CS Select
+	HAL_Delay(1);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 1); // CS deSelect
+	HAL_Delay(1);
+}
+
+void IODIRB_Init(){
+	if(HAL_GPIO_ReadPin(GPIOD,GPIO_PIN_2)){
+		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 0); // CS Select
+		SPITx[0] = 0b01000000;
+		SPITx[1] = 0x01;
+		SPITx[2] = 0;
+		SPITx[3] = 0;
+		HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
+}}
+
+void IODIRA_Init(){
+	if(HAL_GPIO_ReadPin(GPIOD,GPIO_PIN_2)){
+		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 0); // CS Select
+		SPITx[0] = 0b01000001;
+		SPITx[1] = 0x00;
+		SPITx[2] = 0;
+		SPITx[3] = 0;
+		HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
+}}
 
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
-HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 1); //CS dnSelect
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 1); //CS dnSelect
 }
+
+
+
 /* USER CODE END 4 */
 
 /**
