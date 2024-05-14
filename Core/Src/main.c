@@ -51,13 +51,14 @@ SPI_HandleTypeDef hspi3;
 uint8_t SPIRx[10];
 uint8_t SPITx[10];
 uint8_t Button[4];
-uint8_t mode =2 ;
+uint8_t mode;
+uint8_t LightOrder[10];
 uint8_t PushOrder[10];
+uint8_t AnsCorrect;
 uint8_t num;
 uint8_t a[5];
 uint8_t b;
-float c;
-uint8_t d;
+uint8_t Equal;
 uint8_t RandNum;
 uint8_t LedOff;
 /* USER CODE END PV */
@@ -75,7 +76,7 @@ void IODIRB_Init();
 void SPITxRx_Setup();
 void SPITxRx_readIO();
 void SPITxRx_writeIO();
-void LedOrder();
+void AnsCheck();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -122,6 +123,7 @@ int main(void)
   IODIRB_Init();
   IODIRA_Init();
   num = 5;
+  mode = 2;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -133,23 +135,25 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 
-	  static uint64_t timestamp = 0;
-	  if (HAL_GetTick() > timestamp)
-	  {
-		  RandNum = (b%4)+1;
+
 		  if(mode == 1){
-			  SPITxRx_writeIO();
-		  }else if(mode ==2){
+			  static uint64_t timestamp = 0;
+			  if (HAL_GetTick() > timestamp){
+				  RandNum = (b%4)+1;
+				  SPITxRx_writeIO();
+				  a[0] += 1;
+				  timestamp = HAL_GetTick() + 1000;
+			  }
+		  }else if(mode == 2){
 			  SPITxRx_readIO();
 			  }
-
-		  timestamp = HAL_GetTick() + 1000;
-		  a[0] +=1;
-	  	  }
+		  AnsCheck();
 
 
 
-	  //a = ADC_Read[0] % 4;
+
+
+
 	  b+=1;
   }
   /* USER CODE END 3 */
@@ -427,7 +431,7 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void SPITxRx_readIO()
+void SPITxRx_readIO() //mode2
 {
 	if(HAL_GPIO_ReadPin(GPIOD,GPIO_PIN_2)){
 		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, 0); // CS Select
@@ -436,21 +440,46 @@ void SPITxRx_readIO()
 		SPITx[2] = 0;
 		SPITx[3] = 0;
 
-		HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
-//
-//	for(int i = 0;i<num;i++){
-//		if(SPIRx[2]== 1110){
-//			PushOrder[i] = 1;
-//		}else if(SPIRx[2]== 1101){
-//			PushOrder[i] = 2;
-//		}else if(SPIRx[2]== 1011){
-//			PushOrder[i] = 3;
-//		}else if(SPIRx[2]== 111){
-//			PushOrder[i] = 4;
-//		}
+	//for(int i = 0;i<=num;i++){
+		if(SPIRx[2]== 14){
+			//PushOrder[i] = 1;
+			a[4] = 1;
+			a[2]+=1;
+		}else if(SPIRx[2]== 13){
+			//PushOrder[i] = 2;
+			a[4] = 2;
+			a[2]+=1;
+		}else if(SPIRx[2]== 11){
+			a[4] = 3;
+			a[2]+=1;
+			//PushOrder[i] = 3;
+		}else if(SPIRx[2]== 7){
+			a[4] = 4;
+			a[2]+=1;
+			//PushOrder[i] = 4;
+		}
+		PushOrder[a[2]] = a[4];
+		if(a[2] >= num-1){
+			//mode = 2;
+			a[2] = 0;
+		}
+	//}
 
-}
-}
+	HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
+
+	if(a[2] >= num-1){
+//		if(PushOrder == LedOrder){
+//			AnsCorrect = 1;
+//			mode = 2;
+//		}else{
+//			AnsCorrect = 0;
+//			num = 5;
+//		}
+//		for(int i = 0;i<=num-1;i++){
+//			LedOrder[i] = 0;
+//		}
+	}
+}}
 
 void SPITxRx_writeIO(){ //mode1
 	if(HAL_GPIO_ReadPin(GPIOD,GPIO_PIN_2)){
@@ -458,32 +487,32 @@ void SPITxRx_writeIO(){ //mode1
 		if(LedOff == 0){
 			SPITx[0] = 0b01000000;
 			SPITx[1] = 0x15;
-	//		SPITx[2] = 0b00000001;
-			SPITx[3] = 0;
-
-			for(int i = 0;i<=num;i++){
 				if(RandNum == 1){
 					SPITx[2] = ~(0b00000001);
 					LedOff = 1 ;
+					a[3] = 1;
 				}else if(RandNum == 2){
 					SPITx[2] = ~(0b00000010);
 					LedOff = 1 ;
+					a[3] = 2;
 				}else if(RandNum == 3){
 					SPITx[2] = ~(0b00000100);
 					LedOff = 1 ;
+					a[3] = 3;
 				}else if(RandNum == 4){
 					SPITx[2] = ~(0b00001000);
 					LedOff = 1 ;
+					a[3] = 4;
 				}
-		}
-			c = c+1;
-			if(c >= num){
+			LightOrder[a[1]] = a[3];
+			a[1] = a[1]+1;
+			if(a[1] >= num){
 				num += 1;
 				SPITx[2] = 0b00000000;
 				mode = 2;
-				c = 0;
+				a[1] = 0;
 			}
-			HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
+			HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 3);
 		}
 		else if(LedOff == 1){
 			SPITx[0] = 0b01000000;
@@ -497,10 +526,18 @@ void SPITxRx_writeIO(){ //mode1
 
 	}}
 
+void AnsCheck(){
 
-void LedOrder(){
-	//RandNum = (ADC_Read[0] % 4)+1;
+//	if(LightOrder[i]!=PushOrder[i]){
+//		AnsCorrect &= 0;
+//	}else{
+//		AnsCorrect &= 1;
+//	}
+
 }
+
+
+
 
 //void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 //	if()
@@ -556,7 +593,6 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
 #ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
