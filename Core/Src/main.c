@@ -47,6 +47,8 @@ UART_HandleTypeDef hlpuart1;
 
 SPI_HandleTypeDef hspi3;
 
+TIM_HandleTypeDef htim16;
+
 /* USER CODE BEGIN PV */
 uint8_t SPIRx[10];
 uint8_t SPITx[10];
@@ -56,7 +58,7 @@ uint8_t LightOrder[10];
 uint8_t PushOrder[10];
 uint8_t AnsCorrect;
 uint8_t num;
-uint8_t a[5];
+uint8_t a[10];
 uint8_t b;
 uint8_t Equal;
 uint8_t RandNum;
@@ -70,13 +72,14 @@ static void MX_DMA_Init(void);
 static void MX_LPUART1_UART_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
 void IODIRA_Init();
 void IODIRB_Init();
 void SPITxRx_Setup();
 void SPITxRx_readIO();
 void SPITxRx_writeIO();
-void AnsCheck();
+uint8_t AnsCheck();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -98,8 +101,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-
-	HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -118,6 +120,7 @@ int main(void)
   MX_LPUART1_UART_Init();
   MX_SPI3_Init();
   MX_ADC1_Init();
+  MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
   SPITxRx_Setup();
   IODIRB_Init();
@@ -361,6 +364,42 @@ static void MX_SPI3_Init(void)
 }
 
 /**
+  * @brief TIM16 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM16_Init(void)
+{
+
+  /* USER CODE BEGIN TIM16_Init 0 */
+
+  /* USER CODE END TIM16_Init 0 */
+
+  /* USER CODE BEGIN TIM16_Init 1 */
+
+  /* USER CODE END TIM16_Init 1 */
+  htim16.Instance = TIM16;
+  htim16.Init.Prescaler = 169;
+  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim16.Init.Period = 1145;
+  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim16.Init.RepetitionCounter = 0;
+  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_OnePulse_Init(&htim16, TIM_OPMODE_SINGLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM16_Init 2 */
+
+  /* USER CODE END TIM16_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -440,45 +479,37 @@ void SPITxRx_readIO() //mode2
 		SPITx[2] = 0;
 		SPITx[3] = 0;
 
-	//for(int i = 0;i<=num;i++){
 		if(SPIRx[2]== 14){
-			//PushOrder[i] = 1;
 			a[4] = 1;
-			a[2]+=1;
 		}else if(SPIRx[2]== 13){
-			//PushOrder[i] = 2;
 			a[4] = 2;
-			a[2]+=1;
 		}else if(SPIRx[2]== 11){
 			a[4] = 3;
-			a[2]+=1;
-			//PushOrder[i] = 3;
 		}else if(SPIRx[2]== 7){
 			a[4] = 4;
-			a[2]+=1;
-			//PushOrder[i] = 4;
+		}else{
+			a[4] = 5;
 		}
-		PushOrder[a[2]] = a[4];
+
+		if(a[5]!=a[4] && a[4] == 5){
+			a[2]=a[2]+1;
+		}
+		// set a[5] = old a[4]
+		a[5] = a[4];
+
 		if(a[2] >= num-1){
-			//mode = 2;
+			a[7] =1;
+			mode = 2;
 			a[2] = 0;
 		}
-	//}
+		if(AnsCheck()== 1 && a[7]){
+			AnsCorrect = 1;
+		}else if (AnsCheck() == 0 && a[7]){
+			AnsCorrect = 0;
+		}
 
 	HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 4);
 
-	if(a[2] >= num-1){
-//		if(PushOrder == LedOrder){
-//			AnsCorrect = 1;
-//			mode = 2;
-//		}else{
-//			AnsCorrect = 0;
-//			num = 5;
-//		}
-//		for(int i = 0;i<=num-1;i++){
-//			LedOrder[i] = 0;
-//		}
-	}
 }}
 
 void SPITxRx_writeIO(){ //mode1
@@ -526,14 +557,19 @@ void SPITxRx_writeIO(){ //mode1
 
 	}}
 
-void AnsCheck(){
+uint8_t AnsCheck(){
+	if(LightOrder[a[6]]!=PushOrder[a[6]]){
+		AnsCorrect &= 0;
+		a[6] +=1;
+	}else if (LightOrder[a[6]]== PushOrder[a[6]]){
+		AnsCorrect &= 1;
+		a[6] +=1;
+	}
 
-//	if(LightOrder[i]!=PushOrder[i]){
-//		AnsCorrect &= 0;
-//	}else{
-//		AnsCorrect &= 1;
-//	}
-
+	if(a[6] == 9){
+		a[6] = 0;
+		return AnsCorrect;
+	}
 }
 
 
@@ -593,6 +629,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
+
 #ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
