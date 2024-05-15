@@ -21,6 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "ModBusRTU.h"
 
 /* USER CODE END Includes */
 
@@ -44,6 +45,7 @@ ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
 UART_HandleTypeDef hlpuart1;
+UART_HandleTypeDef huart1;
 
 SPI_HandleTypeDef hspi3;
 
@@ -73,6 +75,7 @@ static void MX_LPUART1_UART_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM16_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 void IODIRA_Init();
 void IODIRB_Init();
@@ -121,12 +124,13 @@ int main(void)
   MX_SPI3_Init();
   MX_ADC1_Init();
   MX_TIM16_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   SPITxRx_Setup();
   IODIRB_Init();
   IODIRA_Init();
-  num = 5;
-  mode = 2;
+  num = 4;
+  mode = 1;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -324,6 +328,54 @@ static void MX_LPUART1_UART_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 19200;
+  huart1.Init.WordLength = UART_WORDLENGTH_9B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_EVEN;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief SPI3 Initialization Function
   * @param None
   * @retval None
@@ -491,15 +543,16 @@ void SPITxRx_readIO() //mode2
 			a[4] = 5;
 		}
 
-		if(a[5]!=a[4] && a[4] == 5){
+		if(a[5]!=a[4] && a[4] == 5 && a[5] != 0){
 			a[2]=a[2]+1;
+			PushOrder[a[2]-1] = a[5];
 		}
 		// set a[5] = old a[4]
 		a[5] = a[4];
 
 		if(a[2] >= num-1){
 			a[7] =1;
-			mode = 2;
+			mode = 1;
 			a[2] = 0;
 		}
 		if(AnsCheck()== 1 && a[7]){
@@ -537,13 +590,16 @@ void SPITxRx_writeIO(){ //mode1
 				}
 			LightOrder[a[1]] = a[3];
 			a[1] = a[1]+1;
-			if(a[1] >= num){
-				num += 1;
-				SPITx[2] = 0b00000000;
-				mode = 2;
-				a[1] = 0;
-			}
 			HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 3);
+
+		}else if(a[1] >= num){
+			LedOff = 0;
+			num += 1;
+			SPITx[2] = 0b00000000;
+			mode = 2;
+			a[1] = 0;
+			HAL_SPI_TransmitReceive_IT(&hspi3, SPITx, SPIRx, 3);
+
 		}
 		else if(LedOff == 1){
 			SPITx[0] = 0b01000000;
